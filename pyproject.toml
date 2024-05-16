@@ -10,6 +10,7 @@ python = "^3.10"
 matplotlib = "^3.9.0"
 psql-connector = {git = "https://github.com/Bastianciito/psql_connector.git"}
 pytest = "^8.2.0"
+black = "^24.4.2"
 
 
 [build-system]
