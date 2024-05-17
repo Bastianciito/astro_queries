@@ -1,4 +1,4 @@
-from astro_queries.astro_object import AstroFrame
+from astro_queries.astro_models import AstroFrame
 from psql_connector import PgConnector
 from unittest.mock import patch
 
