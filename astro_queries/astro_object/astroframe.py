@@ -20,7 +20,14 @@ class AstroFrame:
 
     def _fetch_lightcurve(self):
 
-        if self.psql_conn.conn is not None:
+        if self.psql_conn.conn is None:
+            logging.warning(
+                "PSQL connector was not initializateed, try to create db connection with '_connect_to_database' method."
+            )
+        if self.oid is None:
+            logging.warning("oid was not initializateed.")
+
+        if self.oid is not None and self.psql_conn is not None:
             logging.info("Fetching raw lightcurves")
             astro_query_dd, astro_query_ff = get_detections_and_force_photometry_by_oid(
                 oid=self.oid
@@ -30,10 +37,6 @@ class AstroFrame:
 
             self.detections = df_dd
             self.forced_photometry = df_ff
-        else:
-            logging.warning(
-                "PSQL connector was not initializateed, try to create db connection with '_connect_to_database' method."
-            )
 
     def deduplicate(self):
         self.detections_filtered = None
