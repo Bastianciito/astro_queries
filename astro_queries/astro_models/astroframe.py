@@ -3,6 +3,7 @@ from psql_connector import PgConnector
 import matplotlib.pyplot as plt
 import logging
 import numpy as np
+import pandas as pd
 
 
 class AstroFrame:
@@ -15,7 +16,6 @@ class AstroFrame:
         self.detections_filtered = None
         self.forced_photometry_filtered = None
         self.psql_conn = PgConnector()
-
         # From Masci+2023 sections 6.4 and 6.5
         self.SNT = 3.0
         self.SNU = 5.0
@@ -23,6 +23,7 @@ class AstroFrame:
     def _connect_to_database(self, **kwargs):
         self.psql_conn.create_conn(**kwargs)
 
+    # Transformations extracted from https://github.com/alercebroker/usecases/blob/master/notebooks/CosmicStreams_Dec2023_tutorial/ALeRCE_Basics_CosmicStreams.ipynb
     def magdiff2flux_uJy(self, df=None, col_mag=None, col_isdiffpos="isdiffpos"):
         return 10.0 ** (-0.4 * (df[col_mag] - 23.9)) * df[col_isdiffpos]
 
@@ -72,7 +73,12 @@ class AstroFrame:
         return df
 
     def _get_flux_uJd(self):
-        pass
+        logging.info(
+            "Creating Flux diff columns to detections and forced photometry dataframes"
+        )
+        self.detections = self.flux_dets(df_dets=self.detections)
+        self.forced_photometry = self.flux_forced(df_forced=self.forced_photometry)
+        logging.info("Columns created")
 
     def _fetch_lightcurve(self):
 
@@ -93,10 +99,28 @@ class AstroFrame:
 
             self.detections = df_dd
             self.forced_photometry = df_ff
+            # get fluxes
+            self._get_flux_uJd()
+            self.deduplicate()
 
     def deduplicate(self):
-        self.detections_filtered = None
-        self.forced_photometry_filtered = None
+
+        g_band = self.detections.loc[self.detections.fid == 1]
+        r_band = self.detections.loc[self.detections.fid == 2]
+
+        g_band_forced = self.forced_photometry.loc[self.forced_photometry.fid == 1]
+        r_band_forced = self.forced_photometry.loc[self.forced_photometry.fid == 2]
+
+        g_band = g_band.drop_duplicates(subset=["mjd"])
+        r_band = r_band.drop_duplicates(subset=["mjd"])
+
+        g_band_forced = g_band_forced.drop_duplicates(subset=["mjd"])
+        r_band_forced = r_band_forced.drop_duplicates(subset=["mjd"])
+
+        self.detections_filtered = pd.concat([g_band, r_band], ignore_index=True)
+        self.forced_photometry_filtered = pd.concat(
+            [g_band_forced, r_band_forced], ignore_index=True
+        )
 
     def plot_curves_ztf_gr(self, **kwargs):
 
@@ -108,11 +132,14 @@ class AstroFrame:
             g_band = self.detections.loc[self.detections.fid == 1]
             r_band = self.detections.loc[self.detections.fid == 2]
 
+            g_band_filter = self.detections_filtered[self.detections_filtered.fid == 1]
+            r_band_filter = self.detections_filtered[self.detections_filtered.fid == 2]
+
             if len(g_band) > 0:
                 ax[0].errorbar(
                     g_band.mjd,
-                    g_band.magpsf,
-                    yerr=g_band.sigmapsf,
+                    g_band.fluxdiff_uJy,
+                    yerr=g_band.fluxerrdiff_uJy,
                     color="g",
                     fmt="o",
                     alpha=0.5,
@@ -121,12 +148,34 @@ class AstroFrame:
             if len(r_band) > 0:
                 ax[0].errorbar(
                     r_band.mjd,
-                    r_band.magpsf,
-                    yerr=r_band.sigmapsf,
+                    r_band.fluxdiff_uJy,
+                    yerr=r_band.fluxerrdiff_uJy,
                     color="r",
                     fmt="o",
                     alpha=0.5,
                     label="Detections r-band",
+                )
+
+            if len(g_band_filter) > 0:
+                ax[1].errorbar(
+                    g_band_filter.mjd,
+                    g_band_filter.fluxdiff_uJy,
+                    yerr=g_band_filter.fluxerrdiff_uJy,
+                    color="g",
+                    fmt="o",
+                    alpha=0.5,
+                    label="Detections g-band (filter)",
+                )
+
+            if len(r_band_filter) > 0:
+                ax[1].errorbar(
+                    r_band_filter.mjd,
+                    r_band_filter.fluxdiff_uJy,
+                    yerr=r_band_filter.fluxerrdiff_uJy,
+                    color="r",
+                    fmt="o",
+                    alpha=0.5,
+                    label="Detections r-band (filter)",
                 )
 
         if self.forced_photometry is not None:
@@ -134,21 +183,47 @@ class AstroFrame:
             g_band = self.forced_photometry.loc[self.forced_photometry.fid == 1]
             r_band = self.forced_photometry.loc[self.forced_photometry.fid == 2]
 
+            g_band_filter = self.forced_photometry_filtered[
+                self.forced_photometry_filtered.fid == 1
+            ]
+            r_band_filter = self.forced_photometry_filtered[
+                self.forced_photometry_filtered.fid == 2
+            ]
+
             if len(g_band) > 0:
                 ax[0].plot(
                     g_band.mjd,
-                    g_band.mag,
-                    "ro",
-                    marker="s",
+                    g_band.fluxdiff_uJy_forced,
+                    "gs",
+                    # marker="s",
                     alpha=0.5,
                     label="Forced Photometry g-band",
                 )
             if len(r_band) > 0:
                 ax[0].plot(
                     r_band.mjd,
-                    r_band.mag,
-                    "ro",
-                    marker="s",
+                    r_band.fluxdiff_uJy_forced,
+                    "rs",
+                    # marker="s",
+                    alpha=0.5,
+                    label="Forced Photometry r-band",
+                )
+
+            if len(g_band) > 0:
+                ax[1].plot(
+                    g_band_filter.mjd,
+                    g_band_filter.fluxdiff_uJy_forced,
+                    "gs",
+                    # marker="s",
+                    alpha=0.5,
+                    label="Forced Photometry g-band",
+                )
+            if len(r_band) > 0:
+                ax[1].plot(
+                    r_band_filter.mjd,
+                    r_band_filter.fluxdiff_uJy_forced,
+                    "rs",
+                    # marker="s",
                     alpha=0.5,
                     label="Forced Photometry r-band",
                 )
@@ -156,6 +231,7 @@ class AstroFrame:
         if "time_lapse" in kwargs.keys():
             try:
                 ax[0].set_xlim(kwargs["time_lapse"])
+                ax[1].set_xlim(kwargs["time_lapse"])
             except:
                 pass
         ax[0].grid(False)
@@ -164,6 +240,8 @@ class AstroFrame:
         ax[1].set_title("Lightcurve with deduplication")
         ax[0].set_xlabel("[MJD]")
         ax[1].set_xlabel("[MJD]")
+        ax[0].set_ylabel("Flux difference [uJy]")
+        ax[1].set_ylabel("Flux difference [uJy]")
         ax[0].legend()
         ax[1].legend()
         return fig, ax
