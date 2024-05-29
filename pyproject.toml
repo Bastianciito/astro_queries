@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "astro-queries"
-version = "0.5.0"
+version = "0.5.10"
 description = ""
 authors = ["Bastiancito <bastian.gamboa@ug.uchile.cl>"]
 readme = "README.md"
@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 matplotlib = "^3.9.0"
-psql-connector = {git = "https://github.com/Bastianciito/psql_connector.git"}
+psql-connector = {path = "../psql_connector"}
 pytest = "^8.2.0"
 black = "^24.4.2"
 
