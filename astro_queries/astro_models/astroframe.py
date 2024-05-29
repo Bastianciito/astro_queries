@@ -180,9 +180,9 @@ class AstroFrame:
         self.deduplicate_by_mjd()
         self.deduplicate_by_oid_pid()
 
-    def define_cadence(self, delta):
-        def find_slot(value, arr):
-            return np.argmax(value < arr)
+    def define_cadence(self, delta, **kwargs):
+        def find_slot(value, delta):
+            return int(value / delta)
 
         g_band = self.detections_filtered.loc[self.detections_filtered.fid == 1].copy()
         r_band = self.detections_filtered.loc[self.detections_filtered.fid == 2].copy()
@@ -194,32 +194,28 @@ class AstroFrame:
             self.forced_photometry_filtered.fid == 2
         ].copy()
 
-        grid_g = np.arange(g_band.mjd.min(), g_band.mjd.max(), delta)
-        grid_r = np.arange(r_band.mjd.min(), r_band.mjd.max(), delta)
-        grid_forced_g = np.arange(
-            g_band_forced.mjd.min(), g_band_forced.mjd.max(), delta
-        )
-        grid_forced_r = np.arange(
-            r_band_forced.mjd.min(), r_band_forced.mjd.max(), delta
-        )
+        g_band["norm_mjd"] = g_band["mjd"] - g_band["mjd"].min()
+        r_band["norm_mjd"] = r_band["mjd"] - r_band["mjd"].min()
+        g_band_forced["norm_mjd"] = g_band_forced["mjd"] - g_band_forced["mjd"].min()
+        r_band_forced["norm_mjd"] = r_band_forced["mjd"] - r_band_forced["mjd"].min()
 
         g_band["time_slot"] = g_band.apply(
-            lambda x: find_slot(x["mjd"], grid_g), axis=1
+            lambda x: find_slot(x["norm_mjd"], delta), axis=1
         )
-        r_band["time_slot"] = g_band.apply(
-            lambda x: find_slot(x["mjd"], grid_r), axis=1
+        r_band["time_slot"] = r_band.apply(
+            lambda x: find_slot(x["norm_mjd"], delta), axis=1
         )
-        g_band_forced["time_slot"] = g_band.apply(
-            lambda x: find_slot(x["mjd"], grid_forced_g), axis=1
+        g_band_forced["time_slot"] = g_band_forced.apply(
+            lambda x: find_slot(x["norm_mjd"], delta), axis=1
         )
-        r_band_forced["time_slot"] = g_band.apply(
-            lambda x: find_slot(x["mjd"], grid_forced_r), axis=1
+        r_band_forced["time_slot"] = r_band_forced.apply(
+            lambda x: find_slot(x["norm_mjd"], delta), axis=1
         )
 
-        g_band.drop_duplicates(subset=["time_slot"], inplace=True)
-        r_band.drop_duplicates(subset=["time_slot"], inplace=True)
-        g_band_forced.drop_duplicates(subset=["time_slot"], inplace=True)
-        r_band_forced.drop_duplicates(subset=["time_slot"], inplace=True)
+        g_band.drop_duplicates(subset=["time_slot"], keep="first", inplace=True)
+        r_band.drop_duplicates(subset=["time_slot"], keep="first", inplace=True)
+        g_band_forced.drop_duplicates(subset=["time_slot"], keep="first", inplace=True)
+        r_band_forced.drop_duplicates(subset=["time_slot"], keep="first", inplace=True)
 
         return g_band, r_band, g_band_forced, r_band_forced
 
@@ -281,8 +277,8 @@ class AstroFrame:
         for detections_band, color in zip([g_band_forced, r_band_forced], ["g", "r"]):
             if len(detections_band) > 0:
                 ax[0].plot(
-                    g_band.mjd,
-                    g_band.fluxdiff_uJy_forced,
+                    detections_band.mjd,
+                    detections_band.fluxdiff_uJy_forced,
                     f"{color}s",
                     # marker="s",
                     alpha=0.5,
@@ -294,8 +290,8 @@ class AstroFrame:
         ):
             if len(detections_band) > 0:
                 ax[0].plot(
-                    g_band.mjd,
-                    g_band.fluxdiff_uJy_forced,
+                    detections_band.mjd,
+                    detections_band.fluxdiff_uJy_forced,
                     f"{color}s",
                     # marker="s",
                     alpha=0.5,
@@ -312,10 +308,10 @@ class AstroFrame:
         ax[0].grid(False)
         ax[1].grid(False)
         ax[0].set_title(
-            f"Lightcurve without deduplication\n[n_det_g={meta['n_det_g']}]-[n_forced_g={meta['n_forced_g']}]\n[n_det_r={meta['n_det_r']}]-[n_forced_r={meta['n_det_r']}]"
+            f"Lightcurve deduplicate\n[n_det_g={meta['n_det_g']}]-[n_forced_g={meta['n_forced_g']}]\n[n_det_r={meta['n_det_r']}]-[n_forced_r={meta['n_det_r']}]"
         )
         ax[1].set_title(
-            f"Lightcurve with deduplication\n[n_det_g={meta['n_det_g_filter']}]-[n_forced_g={meta['n_forced_g_filter']}]\n[n_det_r={meta['n_det_r_filter']}]-[n_forced_r={meta['n_det_r_filter']}]"
+            f"Lightcurve with normalized cadence\n[n_det_g={meta['n_det_g_filter']}]-[n_forced_g={meta['n_forced_g_filter']}]\n[n_det_r={meta['n_det_r_filter']}]-[n_forced_r={meta['n_det_r_filter']}]"
         )
         ax[0].set_xlabel("[MJD]")
         ax[1].set_xlabel("[MJD]")
