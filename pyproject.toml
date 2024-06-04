@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "astro-queries"
-version = "0.5.18"
+version = "0.5.19"
 description = ""
 authors = ["Bastiancito <bastian.gamboa@ug.uchile.cl>"]
 readme = "README.md"

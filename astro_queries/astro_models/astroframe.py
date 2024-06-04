@@ -289,7 +289,7 @@ class AstroFrame:
             [g_band_forced_filter, r_band_forced_filter], ["g", "r"]
         ):
             if len(detections_band) > 0:
-                ax[0].plot(
+                ax[1].plot(
                     detections_band.mjd,
                     detections_band.fluxdiff_uJy_forced,
                     f"{color}s",
